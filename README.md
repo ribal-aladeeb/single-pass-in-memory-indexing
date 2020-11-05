@@ -1,2 +1,2 @@
-# single-pass-in-memory-inverted
+# single-pass-in-memory-indexing
 Implementing SPIMI for the Reuters21578 corpus
