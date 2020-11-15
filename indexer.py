@@ -1,7 +1,8 @@
 import os
-from os import error
-from typing import List
+from typing import List, Tuple, Dict
 from tqdm import tqdm
+import nltk
+import utils
 
 DATA_DIR = 'data/'
 BLOCK_DIR = 'blocks/'
@@ -24,7 +25,7 @@ def document_extracter(lines: List[str]) -> dict:
     '''
     Returns a dictionary of doc_id -> doc_contents.
     <lines> is the contents of each .sgm file from the <unpack_corpus_step1>
-    func. 
+    func.
     It is a design decision to include only the contents of the text tags
     for the construction of the index.
     '''
@@ -97,9 +98,9 @@ def remove_tags(doc: str) -> str:
 
         if tag_type != '/TEXT':
             '''
-            Implications: 
+            Implications:
                 1. Tag must be TITLE or BODY or DATE and needs to be
-                removed. 
+                removed.
                 2. Add a space so that two words surrounding the tags
                 don't get merged into a single one during tokenization purposes.
             '''
@@ -128,12 +129,69 @@ def clean_reccuring_patterns(doc: str) -> str:
     return doc
 
 
-def generate_blocks(docs: dict) -> None:
+def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR) -> None:
     '''
     Creates the intermediate 500 term dictionaries and stores them in BLOCK_DIR
     in files block_x.txt where x is monotonically increasing.
     '''
 
+    print("Generating and saving block indices")
+    utils.ensure_dir_exists(dir)
+
+    block = {}
+    block_count = 1
+
+    for docID, contents in tqdm(docs.items()):
+        tokenizer = nltk.RegexpTokenizer(r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}")
+        tokens = tokenizer.tokenize(contents)
+
+        for token in tokens:
+            frequency, postings = block.get(token, (0, set()))
+            postings.add(docID)
+            frequency = len(postings)
+            block[token] = (frequency, postings)
+
+            if len(block) == 500:
+
+                for token in block:
+                    freq: int
+                    postings: set
+                    freq, postings = block[token]
+                    block[token] = freq, sorted(list(postings))
+
+                filename = os.path.join(dir, f'block_{block_count}.txt')
+                utils.save_index_to_disk(block, filename)
+                block = {}
+                block_count += 1
+
+
+def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]]]:
+    '''
+    Merge all block indices in BLOCK_DIR into a single inverted index.
+    '''
+    inverted_index = {}
+    print('Merging all blocks')
+    for block_file in tqdm(os.listdir(dir)):
+        block = utils.load_index(os.path.join(dir,block_file))
+        for token in block:
+            postings: set = inverted_index.get(token, set())
+            _, block_postings = block[token]
+            postings.update(block_postings)
+            inverted_index[token] = postings
+
+    for token in inverted_index:
+        postings: set = inverted_index[token]
+        postings: list = sorted(list(postings))
+        freq = len(postings)
+
+        inverted_index[token] = freq, postings
+
+    return inverted_index
+
 
 if __name__ == '__main__':
-    dictt = document_extracter(unpack_corpus_step1(DATA_DIR))
+    docs: dict = document_extracter(unpack_corpus_step1(DATA_DIR))
+    generate_and_save_blocks_to_disk(docs)
+    inverted_index = merge_blocks_into_one_index()
+    utils.save_index_to_disk(inverted_index, outfile='inverted_index.txt')
+
