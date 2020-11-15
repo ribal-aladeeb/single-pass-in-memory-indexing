@@ -1,3 +1,7 @@
+.vscode
+data
+blocks
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
