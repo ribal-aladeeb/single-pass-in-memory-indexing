@@ -3,6 +3,8 @@ from typing import List, Tuple, Dict
 from tqdm import tqdm
 import nltk
 import utils
+import time
+
 
 DATA_DIR = 'data/'
 BLOCK_DIR = 'blocks/'
@@ -172,7 +174,7 @@ def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]
     inverted_index = {}
     print('Merging all blocks')
     for block_file in tqdm(os.listdir(dir)):
-        block = utils.load_index(os.path.join(dir,block_file))
+        block = utils.load_index(os.path.join(dir, block_file))
         for token in block:
             postings: set = inverted_index.get(token, set())
             _, block_postings = block[token]
@@ -190,8 +192,12 @@ def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]
 
 
 if __name__ == '__main__':
+    start_time = time.time()
+
     docs: dict = document_extracter(unpack_corpus_step1(DATA_DIR))
     generate_and_save_blocks_to_disk(docs)
     inverted_index = merge_blocks_into_one_index()
     utils.save_index_to_disk(inverted_index, outfile='inverted_index.txt')
 
+    elapsed = round(time.time() - start_time, 2)
+    print(f'\nSPIMI performed in {elapsed} seconds')
