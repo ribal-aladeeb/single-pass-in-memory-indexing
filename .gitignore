@@ -2,6 +2,7 @@
 data
 blocks
 inverted_index.txt
+documents
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -6,8 +6,10 @@ import utils
 import time
 
 
-DATA_DIR = 'data/'
 BLOCK_DIR = 'blocks/'
+DATA_DIR = 'data/'
+DOCUMENT_DIR = 'documents/'
+TOKENIZING_REGEX = r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}"
 
 
 def unpack_corpus_step1(path: str) -> List[str]:
@@ -131,7 +133,61 @@ def clean_reccuring_patterns(doc: str) -> str:
     return doc
 
 
-def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR) -> None:
+def save_extracted_docs(docs: Dict[int, str], dir=DOCUMENT_DIR) -> bool:
+    '''
+    This func will save the extracted contents into distinct files so that if
+    you want to see the contents of document 7896, you don't need to parse the
+    whole sgm files to look for the one containing it and to extract the reuters
+    tag containing it. Instead you can just open the ./documents/7896 text file.
+    This will be useful later to return the relevant query results.
+    '''
+
+    utils.ensure_dir_exists(dir)
+
+    print(f"Writing the extracted docs into the {dir} folder")
+
+    for ID in docs:
+        with open(os.path.join(dir, str(ID)), mode='w') as f:
+            f.write(docs[ID])
+
+    return True
+
+
+def load_extracted_docs(dir=DOCUMENT_DIR) -> Dict[int, str]:
+    '''
+    This function will load docs from the documents/ folder and return the exact
+    same format as the document_extracter function.
+    '''
+
+    if not os.path.isdir(dir):
+        return {}
+
+    docs = {}
+
+    for filename in os.listdir(dir):
+        with open(os.path.join(dir, filename), mode='r') as f:
+            ID = int(filename)
+            docs[ID] = f.read()
+
+    return docs
+
+
+def extract_documents(data_dir=DATA_DIR, doc_dir=DOCUMENT_DIR, regex=TOKENIZING_REGEX):
+    '''
+    This function will extract the documents into a dictionary mapping of ID ->
+    cleaned string contents. If the documents have previously been extracted in
+    the DOCUMENT_DIR folder, it will take the shortcut of reading those file.
+    Otherwise it will go over the sgm corpus files.
+    '''
+
+    docs: dict = load_extracted_docs()
+    if len(docs) == 0:  # the documents have not previously been extracted into the DOCUMENT_DIR
+        docs = document_extracter(unpack_corpus_step1(DATA_DIR))
+
+    return docs
+
+
+def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR, regex=TOKENIZING_REGEX) -> None:
     '''
     Creates the intermediate 500 term dictionaries and stores them in BLOCK_DIR
     in files block_x.txt where x is monotonically increasing.
@@ -144,7 +200,7 @@ def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR) -> None:
     block_count = 1
 
     for docID, contents in tqdm(docs.items()):
-        tokenizer = nltk.RegexpTokenizer(r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}")
+        tokenizer = nltk.RegexpTokenizer(regex)
         tokens = tokenizer.tokenize(contents)
 
         for token in tokens:
@@ -191,13 +247,21 @@ def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]
     return inverted_index
 
 
-if __name__ == '__main__':
+def main():
+
     start_time = time.time()
 
-    docs: dict = document_extracter(unpack_corpus_step1(DATA_DIR))
+    docs: dict = extract_documents()
     generate_and_save_blocks_to_disk(docs)
     inverted_index = merge_blocks_into_one_index()
     utils.save_index_to_disk(inverted_index, outfile='inverted_index.txt')
 
     elapsed = round(time.time() - start_time, 2)
     print(f'\nSPIMI performed in {elapsed} seconds')
+
+    if not os.path.isdir(DOCUMENT_DIR):
+        save_extracted_docs(docs)
+
+
+if __name__ == '__main__':
+    main()

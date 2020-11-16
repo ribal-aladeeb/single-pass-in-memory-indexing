@@ -10,8 +10,8 @@ def ensure_dir_exists(dir):
     if os.path.isdir(dir):
         return
 
-    print(f'Created {dir} directory')
     os.mkdir(dir)
+    print(f'Created {dir} directory')
 
 
 def save_index_to_disk(inverted_index: Dict[str, Tuple[int, List[int]]], outfile: str) -> None:
