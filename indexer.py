@@ -4,11 +4,13 @@ from tqdm import tqdm
 import nltk
 import utils
 import time
-
+import shutil
 
 BLOCK_DIR = 'blocks/'
+BLOCK_LENGTH = 500
 DATA_DIR = 'data/'
 DOCUMENT_DIR = 'documents/'
+INVERTED_INDEX_FILE = 'inverted_index.txt'
 TOKENIZING_REGEX = r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}"
 
 
@@ -187,19 +189,33 @@ def extract_documents(data_dir=DATA_DIR, doc_dir=DOCUMENT_DIR, regex=TOKENIZING_
     return docs
 
 
-def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR, regex=TOKENIZING_REGEX) -> None:
+def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR, regex=TOKENIZING_REGEX, K=BLOCK_LENGTH) -> None:
     '''
-    Creates the intermediate 500 term dictionaries and stores them in BLOCK_DIR
+    Creates the intermediate K-term dictionaries and stores them in BLOCK_DIR
     in files block_x.txt where x is monotonically increasing.
     '''
 
+    def _save_block(block, block_count):
+        for token in block:
+            freq: int
+            postings: set
+            freq, postings = block[token]
+            block[token] = freq, sorted(list(postings))
+
+        filename = os.path.join(dir, f'block_{block_count}.txt')
+        utils.save_index_to_disk(block, filename)
+
     print("Generating and saving block indices")
+
+    if os.path.isdir(dir):
+        shutil.rmtree(dir)
+
     utils.ensure_dir_exists(dir)
 
     block = {}
     block_count = 1
 
-    for docID, contents in tqdm(docs.items()):
+    for docID, contents in tqdm(sorted(docs.items(), key=lambda x: x[0])):
         tokenizer = nltk.RegexpTokenizer(regex)
         tokens = tokenizer.tokenize(contents)
 
@@ -209,18 +225,15 @@ def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR, regex=TOKENIZING
             frequency = len(postings)
             block[token] = (frequency, postings)
 
-            if len(block) == 500:
-
-                for token in block:
-                    freq: int
-                    postings: set
-                    freq, postings = block[token]
-                    block[token] = freq, sorted(list(postings))
-
-                filename = os.path.join(dir, f'block_{block_count}.txt')
-                utils.save_index_to_disk(block, filename)
+            if len(block) == K:
+                _save_block(block, block_count)
                 block = {}
                 block_count += 1
+
+    print(f'Length of last block {len(block)}')
+    _save_block(block, block_count)  # This is the last block that does not get filled all the way, still need to save it
+
+    return
 
 
 def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]]]:
@@ -252,9 +265,10 @@ def main():
     start_time = time.time()
 
     docs: dict = extract_documents()
-    generate_and_save_blocks_to_disk(docs)
+    generate_and_save_blocks_to_disk(docs, K=10000)
     inverted_index = merge_blocks_into_one_index()
-    utils.save_index_to_disk(inverted_index, outfile='inverted_index.txt')
+    print('Blocks merged, saving complete index to disk')
+    utils.save_index_to_disk(inverted_index, outfile=INVERTED_INDEX_FILE)
 
     elapsed = round(time.time() - start_time, 2)
     print(f'\nSPIMI performed in {elapsed} seconds')
