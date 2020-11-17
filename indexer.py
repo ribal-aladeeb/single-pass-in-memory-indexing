@@ -6,12 +6,17 @@ import utils
 import time
 import shutil
 
+CACHING_DIR = 'cache/'
 BLOCK_DIR = 'blocks/'
 BLOCK_LENGTH = 500
 DATA_DIR = 'data/'
 DOCUMENT_DIR = 'documents/'
 INVERTED_INDEX_FILE = 'inverted_index.txt'
 TOKENIZING_REGEX = r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}"
+
+BLOCK_DIR = os.path.join(CACHING_DIR, BLOCK_DIR)
+DOCUMENT_DIR = os.path.join(CACHING_DIR, DOCUMENT_DIR)
+INVERTED_INDEX_FILE = os.path.join(CACHING_DIR, INVERTED_INDEX_FILE)
 
 
 def unpack_corpus_step1(path: str) -> List[str]:
@@ -230,9 +235,9 @@ def generate_and_save_blocks_to_disk(docs: dict, dir=BLOCK_DIR, regex=TOKENIZING
                 block = {}
                 block_count += 1
 
+    print(f'Blocks are of length {K}')
     print(f'Length of last block {len(block)}')
     _save_block(block, block_count)  # This is the last block that does not get filled all the way, still need to save it
-
     return
 
 
@@ -240,6 +245,7 @@ def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]
     '''
     Merge all block indices in BLOCK_DIR into a single inverted index.
     '''
+
     inverted_index = {}
     print('Merging all blocks')
     for block_file in tqdm(os.listdir(dir)):

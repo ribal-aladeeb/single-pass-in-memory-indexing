@@ -1,8 +1,6 @@
-.vscode
-data
-blocks
-inverted_index.txt
-documents
+.vscode/
+data/
+cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

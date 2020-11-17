@@ -10,7 +10,7 @@ def ensure_dir_exists(dir):
     if os.path.isdir(dir):
         return
 
-    os.mkdir(dir)
+    os.makedirs(dir)
     print(f'Created {dir} directory')
 
 
