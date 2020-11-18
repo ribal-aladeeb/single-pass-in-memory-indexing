@@ -67,22 +67,22 @@ def intersect_postings(terms, inverted_index) -> set:
 
     assert len(terms) > 0, 'terms cannot be empty'
 
-    _, intersected = inverted_index.get(terms[0], (0, []))
+    intersected = set([i for i in range(1, 21579)])
 
-    for i in range(1, len(terms)):
+    for i in range(len(terms)):
         _, postings = inverted_index.get(terms[i], (0, []))
         postings = set(postings)
-        intersected.intersection(postings)
+        intersected = intersected.intersection(postings)
 
     return intersected
 
 
-def union_postings(terms, inverted_index) -> Dict[int, str]:
+def union_postings(terms, inverted_index) -> Dict[int, int]:
     '''
     Returns the intersection or union of the postings list of the terms list
     depending on whether the query_type is AND or OR respectively. Instead of a
-    set, it returns a dictionary of the union where the docIDs are keys and the
-    number of query terms that appear in said document.
+    set, it returns a dictionary of the union where the keys are docIDs  and the
+    values are the number of query terms that appear in said document.
     '''
 
     assert len(terms) > 0, 'terms cannot be empty'
@@ -91,8 +91,8 @@ def union_postings(terms, inverted_index) -> Dict[int, str]:
 
     for term in terms:
         _, postings = inverted_index.get(term, (0, []))
-
         postings = set(postings)
+
         for docID in postings:
             unioned[docID] = unioned.get(docID, 0) + 1
 
@@ -139,7 +139,6 @@ def find_average_document_length() -> int:
 
 def main():
 
-    args = init_params()
     inverted_index = utils.load_index(indexer.INVERTED_INDEX_FILE)
 
     query_type = {
@@ -156,12 +155,16 @@ def main():
             print(f'\n"{requested}" is not a valid type of search.')
         requested = input("Enter the type of search you want to perform ([a]nd, [o]r, [r]anked): ").lower()
 
+    query_terms = input("Please enter your query: ").split(' ')
+
     results = ''
+
     if query_type[requested] == 'RANKED':
-        query_terms = input("Please enter your query: ").split(' ')
+
         postings = list(union_postings(query_terms, inverted_index).keys())
         ranking = {}
         L_avg = find_average_document_length()
+
         for docID in postings:
             ranking[docID] = round(compute_ranking_RSV_11_32(query_terms, docID, L_avg, inverted_index), 2)
 
@@ -169,13 +172,38 @@ def main():
         top10 = sorted_rankings[:10]
 
         if len(top10) == 0:
-            results = '\nNo results found, sorry!'
+            results = '\nSorry, no documents match your query.'
 
         for i in range(len(top10)):
             results += f'\n{i+1}. \tDocument ID {top10[i][0]} \twith ranking {top10[i][1]}'
 
+    elif query_type[requested] == 'AND':
+
+        postings = sorted(list(intersect_postings(query_terms, inverted_index)))
+        print(f'\nThere are {len(postings)} documents that contain all query terms.')
+        print('The first 10 are:')
+        first10 = postings[:10]
+        if len(first10) == 0:
+            results = '\nSorry, no documents match your query.'
+
+        for i in range(len(first10)):
+            results += f'\n{i+1}. \tDocument ID {first10[i]}'
+
+    elif query_type[requested] == 'OR':
+
+        doc_vs_occurence_tuples = union_postings(query_terms, inverted_index).items()
+        postings = sorted(doc_vs_occurence_tuples, reverse=True, key=lambda x: (x[1], -x[0]))  # sort first by number of query terms appearing in document, then by ID
+        top10 = postings[:10]
+        print(f'\nThere are {len(postings)} documents that contain at least one query term.')
+
+        if len(top10) == 0:
+            print('Sorry, no documents match your query.')
+
+        for i in range(len(top10)):
+            results += f'\n{i+1}. \tDocument ID {top10[i][0]} \tcontains {top10[i][1]} query terms'
+
     else:
-        print('ta mere')
+        raise AssertionError("Program flow should never reach this code block")
 
     print(results)
 
