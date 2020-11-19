@@ -1,3 +1,4 @@
+import argparse
 import os
 from typing import List, Tuple, Dict
 from tqdm import tqdm
@@ -17,6 +18,12 @@ TOKENIZING_REGEX = r"[a-zA-Z]+[-']{0,1}[a-zA-Z]*[']{0,1}"
 BLOCK_DIR = os.path.join(CACHING_DIR, BLOCK_DIR)
 DOCUMENT_DIR = os.path.join(CACHING_DIR, DOCUMENT_DIR)
 INVERTED_INDEX_FILE = os.path.join(CACHING_DIR, INVERTED_INDEX_FILE)
+
+
+def init_params():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-k', '--block_size', type=int, default=10000, help="Number of terms in each block")
+    return parser.parse_args()
 
 
 def unpack_corpus_step1(path: str) -> List[str]:
@@ -267,11 +274,16 @@ def merge_blocks_into_one_index(dir=BLOCK_DIR) -> Dict[str, Tuple[int, List[int]
 
 
 def main():
+    block_size = init_params().block_size
+    if block_size <= 0:
+        print("Block size cannot be less than 1!")
+        exit()
+    BLOCK_LENGTH = block_size
 
     start_time = time.time()
 
     docs: dict = extract_documents()
-    generate_and_save_blocks_to_disk(docs, K=10000)
+    generate_and_save_blocks_to_disk(docs, K=BLOCK_LENGTH)
     inverted_index = merge_blocks_into_one_index()
     print('Blocks merged, saving complete index to disk')
     utils.save_index_to_disk(inverted_index, outfile=INVERTED_INDEX_FILE)
