@@ -12,6 +12,7 @@ import indexer
 QUERY_TYPES = ['RANKED', 'AND', 'OR']
 L_AVG_FILENAME = 'average_doc_length.txt'
 L_AVG_FILENAME = os.path.join(indexer.CACHING_DIR, L_AVG_FILENAME)
+HTML_RESULT_FILE = 'search_results.html'
 
 
 def init_params():
@@ -137,6 +138,38 @@ def find_average_document_length() -> int:
     return L_avg
 
 
+def generate_html(query_terms, query_type, docIDs: list, filename=HTML_RESULT_FILE):
+    '''
+    Generate an html file containing the documents found
+    '''
+    contents = []
+
+    for ID in docIDs:
+        with open(os.path.join(indexer.DOCUMENT_DIR, str(ID)), mode='r') as f:
+            contents.append(f.read().replace('\n', '<br>').replace(' ', '&nbsp;'))
+
+    html_contents = '<!DOCTYPE html>\n'
+    html_contents += f'<html><body>\n'
+    html_contents += f'<h1>Your search results</h1>\n'
+
+    if query_type == 'RANKED':
+        html_contents += f'<h3>You performed a ranked search with query: {" ".join(query_terms)}</h3>\n'
+    else:
+        html_contents += f'<h3>Your query was: {f" {query_type} ".join(query_terms)}</h3>\n'
+
+    separator = '-'*80
+    for i in range(len(docIDs)):
+        html_contents += f'<h4>Document {docIDs[i]}</h4>'
+        html_contents += f'<p>{contents[i]}<br>{separator}</p>'
+
+    html_contents += f'</body></html>\n'
+
+    with open(filename, mode='w') as f:
+        f.write(html_contents)
+
+    return os.path.abspath(filename)
+
+
 def main():
 
     inverted_index = utils.load_index(indexer.INVERTED_INDEX_FILE)
@@ -158,7 +191,7 @@ def main():
     query_terms = input("Please enter your query: ").split(' ')
 
     results = ''
-
+    documentIDs = []
     if query_type[requested] == 'RANKED':
 
         postings = list(union_postings(query_terms, inverted_index).keys())
@@ -177,6 +210,8 @@ def main():
         for i in range(len(top10)):
             results += f'\n{i+1}. \tDocument ID {top10[i][0]} \twith ranking {top10[i][1]}'
 
+        documentIDs = [t[0] for t in top10]
+
     elif query_type[requested] == 'AND':
 
         postings = sorted(list(intersect_postings(query_terms, inverted_index)))
@@ -188,6 +223,8 @@ def main():
 
         for i in range(len(first10)):
             results += f'\n{i+1}. \tDocument ID {first10[i]}'
+
+        documentIDs = first10
 
     elif query_type[requested] == 'OR':
 
@@ -202,10 +239,17 @@ def main():
         for i in range(len(top10)):
             results += f'\n{i+1}. \tDocument ID {top10[i][0]} \tcontains {top10[i][1]} query terms'
 
+        documentIDs = [t[0] for t in top10]
+
     else:
         raise AssertionError("Program flow should never reach this code block")
 
     print(results)
+
+    if len(documentIDs) > 0:
+        generated_html_path = generate_html(query_terms, query_type[requested], documentIDs)
+        print("\nYou can view the contents of those documents in the browser if you open:")
+        print(generated_html_path)
 
 
 if __name__ == '__main__':
