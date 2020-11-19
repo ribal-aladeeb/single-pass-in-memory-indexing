@@ -1,6 +1,5 @@
 import argparse
 import os
-from shutil import Error
 import nltk
 from collections import Counter
 import math
@@ -26,7 +25,7 @@ def init_params():
     return args
 
 
-def compute_ranking_RSV_11_32(terms, docID, L_avg, inverted_index, k=5, b=0.5, N=21578) -> float:
+def compute_ranking_RSV_11_32(terms, docID, L_avg, inverted_index, k=100, b=0.9, N=21578) -> float:
     '''
     This func computes the document ranking function 11.32 of the Stanford's NLP
     Information Retrieval textbook. Given a list of terms (i.e a query) and a
@@ -188,7 +187,7 @@ def main():
             print(f'\n"{requested}" is not a valid type of search.')
         requested = input("Enter the type of search you want to perform ([a]nd, [o]r, [r]anked): ").lower()
 
-    query_terms = input("Please enter your query: ").split(' ')
+    query_terms = nltk.regexp_tokenize(input("Please enter your query: "), indexer.TOKENIZING_REGEX)
 
     results = ''
     documentIDs = []
